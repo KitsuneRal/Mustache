@@ -587,7 +587,7 @@ private:
 public:
     string_type text;
     mstch_tag<string_type> tag;
-    std::vector<component> children;
+    mutable std::vector<component> children;
     string_size_type position = string_type::npos;
 
     enum class walk_control {
@@ -613,7 +613,7 @@ public:
         return is_text() && !is_newline() && text.size() == 1 && (text[0] == ' ' || text[0] == '\t');
     }
 
-    void walk_children(const walk_callback& callback) {
+    void walk_children(const walk_callback& callback) const {
         for (auto& child : children) {
             if (child.walk(callback) != walk_control::walk) {
                 break;
@@ -779,7 +779,7 @@ private:
         process_current_text();
 
         // Check for sections without an ending tag
-        root_component.walk_children([&error_message](component<string_type>& comp) -> typename component<string_type>::walk_control {
+        root_component.walk_children([&error_message](const component<string_type>& comp) -> typename component<string_type>::walk_control {
             if (!comp.tag.is_section_begin()) {
                 return component<string_type>::walk_control::walk;
             }
@@ -900,20 +900,20 @@ public:
     }
 
     template <typename stream_type>
-    stream_type& render(const basic_data<string_type>& data, stream_type& stream) {
+    stream_type& render(const basic_data<string_type>& data, stream_type& stream) const {
         render(data, [&stream](const string_type& str) {
             stream << str;
         });
         return stream;
     }
 
-    string_type render(const basic_data<string_type>& data) {
+    string_type render(const basic_data<string_type>& data) const {
         std::basic_ostringstream<typename string_type::value_type> ss;
         return render(data, ss).str();
     }
 
     template <typename stream_type>
-    stream_type& render(basic_context<string_type>& ctx, stream_type& stream) {
+    stream_type& render(basic_context<string_type>& ctx, stream_type& stream) const {
         context_internal<string_type> context{ctx};
         render([&stream](const string_type& str) {
             stream << str;
@@ -921,13 +921,13 @@ public:
         return stream;
     }
 
-    string_type render(basic_context<string_type>& ctx) {
+    string_type render(basic_context<string_type>& ctx) const {
         std::basic_ostringstream<typename string_type::value_type> ss;
         return render(ctx, ss).str();
     }
 
     using render_handler = std::function<void(const string_type&)>;
-    void render(const basic_data<string_type>& data, const render_handler& handler) {
+    void render(const basic_data<string_type>& data, const render_handler& handler) const {
         if (!is_valid()) {
             return;
         }
@@ -957,7 +957,7 @@ private:
         return ss.str();
     }
 
-    void render(const render_handler& handler, context_internal<string_type>& ctx, bool root_renderer = true) {
+    void render(const render_handler& handler, context_internal<string_type>& ctx, bool root_renderer = true) const {
         root_component_.walk_children([&handler, &ctx, this](component<string_type>& comp) -> typename component<string_type>::walk_control {
             return render_component(handler, ctx, comp);
         });
@@ -988,7 +988,7 @@ private:
         ctx.line_buffer.data.append(text);
     }
 
-    typename component<string_type>::walk_control render_component(const render_handler& handler, context_internal<string_type>& ctx, component<string_type>& comp) {
+    typename component<string_type>::walk_control render_component(const render_handler& handler, context_internal<string_type>& ctx, const component<string_type>& comp) const {
         if (comp.is_text()) {
             if (comp.is_newline()) {
                 render_current_line(handler, ctx, &comp);
@@ -1059,7 +1059,7 @@ private:
         optional,
     };
 
-    bool render_lambda(const render_handler& handler, const basic_data<string_type>* var, context_internal<string_type>& ctx, render_lambda_escape escape, const string_type& text, bool parse_with_same_context) {
+    bool render_lambda(const render_handler& handler, const basic_data<string_type>* var, context_internal<string_type>& ctx, render_lambda_escape escape, const string_type& text, bool parse_with_same_context) const {
         const typename basic_renderer<string_type>::type2 render2 = [this, &ctx, parse_with_same_context, escape](const string_type& text, bool escaped) {
             const auto process_template = [this, &ctx, escape, escaped](basic_mustache& tmpl) -> string_type {
                 if (!tmpl.is_valid()) {
@@ -1108,7 +1108,7 @@ private:
         return error_message_.empty();
     }
 
-    bool render_variable(const render_handler& handler, const basic_data<string_type>* var, context_internal<string_type>& ctx, bool escaped) {
+    bool render_variable(const render_handler& handler, const basic_data<string_type>* var, context_internal<string_type>& ctx, bool escaped) const {
         if (var->is_string()) {
             const auto& varstr = var->string_value();
             render_result(ctx, escaped ? escape_(varstr) : varstr);
@@ -1125,7 +1125,7 @@ private:
         return true;
     }
 
-    void render_section(const render_handler& handler, context_internal<string_type>& ctx, component<string_type>& incomp, const basic_data<string_type>* var) {
+    void render_section(const render_handler& handler, context_internal<string_type>& ctx, const component<string_type>& incomp, const basic_data<string_type>* var) const {
         const auto callback = [&handler, &ctx, this](component<string_type>& comp) -> typename component<string_type>::walk_control {
             return render_component(handler, ctx, comp);
         };
@@ -1161,7 +1161,7 @@ private:
     }
 
 private:
-    string_type error_message_;
+    mutable string_type error_message_;
     component<string_type> root_component_;
     escape_handler escape_;
 };
